@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Interactive Shopping List</title>
+  <style>
+    body {
+      font-family: 'Arial', sans-serif;
+    }
+
+    #shopping-list {
+      max-width: 400px;
+      margin: 20px auto;
+    }
+
+    #shopping-items {
+      list-style-type: none;
+      padding: 0;
+    }
+
+    .shopping-item {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      align-items: center;
+      border-bottom: 1px solid #ccc;
+      padding: 8px;
+    }
+
+    input {
+      width: 100%;
+      padding: 8px;
+    }
+
+    #write-list-button,
+    #copy-to-clipboard-button {
+      margin-top: 10px;
+      padding: 8px;
+      cursor: pointer;
+    }
+
+    #shopping-list-output {
+      margin-top: 20px;
+    }
+
+    #custom-item-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr 1fr; /* Add an extra column for quantity */
+      align-items: center;
+      margin-top: 10px;
+    }
+  </style>
+</head>
+<body>
+
+<div id="shopping-list">
+  <h2>Shopping List</h2>
+  <ul id="shopping-items"></ul>
+
+  <!-- Custom item row -->
+  <div id="custom-item-row">
+    <input type="text" id="custom-item-name" placeholder="Custom Item Name">
+    <input list="item-suggestions" type="text" id="inherit-item-name" placeholder="Inherit Position from Item">
+    <input type="number" id="custom-quantity" placeholder="Quantity">
+    <datalist id="item-suggestions">
+      <!-- Suggestions will be dynamically populated -->
+    </datalist>
+    <button onclick="addCustomItem()">Add Custom Item</button>
+  </div>
+
+  <button id="write-list-button" onclick="writeShoppingList()">Write List</button>
+  <button id="copy-to-clipboard-button" onclick="copyToClipboard()">Copy to Clipboard</button>
+  <div id="shopping-list-output"></div>
+</div>
+
+<script>
+  // Define the shopping items
+  const shoppingItems = [
+    { id: 'bread', name: 'Bread', stock: 3, position: 3 },
+    { id: 'milk', name: 'Milk', stock: 3, position: 1 },
+    { id: 'pasta', name: 'Pasta', stock: 3, position: 2 },
+    // Add more items as needed
+  ];
+
+  // Function to create shopping items dynamically
+  function createShoppingItems() {
+    const shoppingList = document.getElementById('shopping-items');
+    shoppingList.innerHTML = ''; // Clear existing items
+
+    shoppingItems.forEach(item => {
+      const listItem = document.createElement('li');
+      listItem.className = 'shopping-item';
+      listItem.id = item.id;
+
+      // Add a hidden input for the position
+      const positionInput = document.createElement('input');
+      positionInput.type = 'hidden';
+      positionInput.name = `position-${item.id}`;
+      positionInput.value = item.position;
+
+      const itemName = document.createElement('span');
+      itemName.textContent = item.name;
+
+      const stockInfo = document.createElement('span');
+      stockInfo.innerHTML = `Stock: <span id="stock-${item.id}">${item.stock}</span>`;
+
+      const buyInput = document.createElement('input');
+      buyInput.type = 'number';
+      buyInput.placeholder = 'Quantity to Buy';
+      buyInput.min = '0';
+      buyInput.id = `buy-${item.id}`;
+      buyInput.addEventListener('keydown', (event) => nextItem(event, getNextItemId(item.id)));
+
+      listItem.appendChild(positionInput);
+      listItem.appendChild(itemName);
+      listItem.appendChild(stockInfo);
+      listItem.appendChild(buyInput);
+
+      shoppingList.appendChild(listItem);
+    });
+
+    // Populate suggestions for the "Inherit Position from" field
+    const itemSuggestions = document.getElementById('item-suggestions');
+    itemSuggestions.innerHTML = '';
+
+    shoppingItems.forEach(item => {
+      const suggestionOption = document.createElement('option');
+      suggestionOption.value = item.name;
+      itemSuggestions.appendChild(suggestionOption);
+    });
+  }
+
+  // Function to get the next item id in the sequence
+  function getNextItemId(currentItemId) {
+    const currentIndex = shoppingItems.findIndex(item => item.id === currentItemId);
+    const nextIndex = (currentIndex + 1) % shoppingItems.length;
+    return shoppingItems[nextIndex].id;
+  }
+
+  // Function to handle "Enter" key press and focus on the next item
+  function nextItem(event, nextItemId) {
+    if (event.key === 'Enter') {
+      event.preventDefault();
+      const nextItemInput = document.getElementById(`buy-${nextItemId}`);
+      if (nextItemInput) {
+        nextItemInput.focus();
+      }
+    }
+  }
+
+  // Function to write the shopping list
+  function writeShoppingList() {
+    const shoppingListOutput = document.getElementById('shopping-list-output');
+
+    // Sort the items by position
+    const sortedItems = shoppingItems.slice().sort((a, b) => a.position - b.position);
+
+    let listText = '<h3>Shopping List:</h3><ul>';
+
+    sortedItems.forEach(item => {
+      const buyInput = document.getElementById(`buy-${item.id}`);
+      const quantityToBuy = buyInput ? parseInt(buyInput.value) || 0 : 0;
+      if (quantityToBuy > 0) {
+        listText += `<li>${item.name}: ${quantityToBuy}</li>`;
+      }
+    });
+
+    listText += '</ul>';
+    shoppingListOutput.innerHTML = listText;
+  }
+
+  // Function to add custom item
+  function addCustomItem() {
+    const customItemNameInput = document.getElementById('custom-item-name');
+    const inheritItemNameInput = document.getElementById('inherit-item-name');
+    const customQuantityInput = document.getElementById('custom-quantity');
+
+    const customItemName = customItemNameInput.value.trim();
+    const inheritItemName = inheritItemNameInput.value.trim();
+    const customQuantity = parseInt(customQuantityInput.value) || 0;
+
+    if (customItemName !== '') {
+      // Store the current values
+      const buyInputs = {};
+      shoppingItems.forEach(item => {
+        const buyInput = document.getElementById(`buy-${item.id}`);
+        if (buyInput) {
+          buyInputs[item.id] = buyInput.value;
+        }
+      });
+
+      // Determine the position for the custom item
+      let customItemPosition = shoppingItems.length + 1; // Default to the end
+
+      if (inheritItemName !== '') {
+        const inheritItem = shoppingItems.find(item => item.name.toLowerCase() === inheritItemName.toLowerCase());
+        if (inheritItem) {
+          customItemPosition = inheritItem.position;
+        }
+      }
+
+      const customItem = {
+        id: customItemName.toLowerCase().replace(/\s/g, '-'),
+        name: customItemName,
+        stock: 0,
+        position: customItemPosition,
+      };
+
+      shoppingItems.push(customItem);
+      createShoppingItems(); // Update the shopping items display
+
+      // Set the quantity for the custom item
+      const customBuyInput = document.getElementById(`buy-${customItem.id}`);
+      if (customBuyInput) {
+        customBuyInput.value = customQuantity;
+      }
+
+      // Restore the values
+      shoppingItems.forEach(item => {
+        const buyInput = document.getElementById(`buy-${item.id}`);
+        if (buyInput && buyInputs[item.id]) {
+          buyInput.value = buyInputs[item.id];
+        }
+      });
+
+      customItemNameInput.value = ''; // Clear the input fields
+      inheritItemNameInput.value = '';
+      customQuantityInput.value = '';
+    }
+  }
+
+  // Function to copy the generated list to the clipboard
+  function copyToClipboard() {
+    const shoppingListOutput = document.getElementById('shopping-list-output');
+    const range = document.createRange();
+    range.selectNode(shoppingListOutput);
+    window.getSelection().removeAllRanges();
+    window.getSelection().addRange(range);
+    document.execCommand('copy');
+    window.getSelection().removeAllRanges();
+    alert('Shopping list copied to clipboard!');
+  }
+
+  // Call the function to create shopping items when the page loads
+  window.addEventListener('load', createShoppingItems);
+</script>
+
+</body>
+</html>
+
